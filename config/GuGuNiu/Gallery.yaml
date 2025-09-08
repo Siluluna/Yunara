@@ -1,0 +1,33 @@
+# ===================================================================
+# |                          咕咕牛图库配置                           |
+# ===================================================================
+
+repositories:
+  - id: 'Core' # 唯一标识符
+    description: '一号仓库 (核心)' # 用于日志和报告的描述
+    url: 'https://github.com/GuGuNiu/Miao-Plugin-MBT' 
+    branch: 'main' # 要跟踪的分支
+    containsOptionalContent: true # 标记此仓库是否包含可选内容 (如 ZZZ/Waves)
+    isCore: true # 标记这是否是包含核心数据
+
+  - id: 'Genshin'
+    description: '二号仓库 (原神)'
+    url: 'https://github.com/GuGuNiu/Miao-Plugin-MBT-2'
+    branch: 'main'
+    containsOptionalContent: false
+    isCore: false
+
+  - id: 'StarRail'
+    description: '三号仓库 (星铁)'
+    url: 'https://github.com/GuGuNiu/Miao-Plugin-MBT-3'
+    branch: 'main'
+    containsOptionalContent: false
+    isCore: false
+
+  - id: 'ZZZ & Waves'
+    description: '四号仓库 (鸣潮&绝区零)'
+    url: 'https://github.com/GuGuNiu/Miao-Plugin-MBT-4'
+    branch: 'main'
+    containsOptionalContent: true
+    isCore: false
+

@@ -1,0 +1,35 @@
+{
+  "name": "yunara",
+  "version": "1.0.0",
+  "description": "The Next-Generation Platform for Siluluna.",
+  "type": "module",
+  "main": "index.js",
+  "author": "Siluluna",
+  "license": "MIT",
+  "keywords": [
+    "Yunzai-Bot",
+    "Miao-Yunzai",
+    "Trss-Yunzai",
+    "yunara"
+  ],
+  "imports": {
+    "#Yunara/apps/*": "./apps/*.js",
+    "#Yunara/utils/*": "./utils/*.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.1.2",
+    "chokidar": "^3.6.0",
+    "express": "^4.19.2",
+    "fs-extra": "^11.2.0",
+    "lodash": "^4.17.21",
+    "sharp": "^0.33.4",
+    "socket.io": "^4.7.5",
+    "winston": "^3.13.1",
+    "winston-daily-rotate-file": "^5.0.0",
+    "yaml": "^2.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Siluluna/Yunara"
+  }
+}

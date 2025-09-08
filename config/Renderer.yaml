@@ -1,0 +1,50 @@
+# ===================================================================
+# |                         浏览器实例配置                           |
+# ===================================================================
+
+# Chromium 文件路径
+# 如果留空，将使用 puppeteer 自带的。如果你的服务器环境特殊，
+# 可以指定一个已安装的 Chrome/Chromium/Edge 的路径。
+# 示例: 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+chromiumPath:
+
+# Puppeteer Websocket 连接地址
+# 用于连接到一个已经独立运行的浏览器实例，例如通过 Docker 部署的 browserless/chrome。
+# 如果设置此项，将忽略 chromiumPath 和 args。
+puppeteerWS:
+
+# 浏览器用户数据目录
+# 用于保存浏览器的缓存、Cookie 等。
+userDataDir: "data/puppeteer"
+
+# 无头模式
+# "new": 新的无头模式，推荐。
+# true: 旧的无头模式。
+# false: 启动带有图形界面的浏览器，用于调试。
+headless: "new"
+
+# 浏览器启动参数
+# 默认已包含在大多数服务器环境下稳定运行所需的参数。
+args:
+  - --disable-gpu
+  - --disable-setuid-sandbox
+  - --no-sandbox
+  - --no-zygote
+
+# ===================================================================
+# |                           截图行为配置                           |
+# ===================================================================
+
+# 截图总超时时间 (毫秒)-从页面开始加载到截图完成的总时限。
+timeout: 30000 # 30 秒
+
+# 页面加载参数
+# waitUntil: 'networkidle0' 意味着等待直到网络在 500ms 内不再有新的连接。
+pageGotoParams:
+  timeout: 20000 # 页面导航的超时
+  waitUntil: "networkidle0"
+
+# 截图计数重启阈值
+# 当截图次数达到此数值时，将自动重启浏览器实例，以释放内存，防止性能下降。
+# 设置为 0 可禁用此功能。
+restartThreshold: 100

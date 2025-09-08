@@ -1,0 +1,20 @@
+{
+  "Moeyy": {
+    "successCount": 10,
+    "failureCount": 1,
+    "totalTime": 150000,
+    "lastUsed": "2025-09-08T00:00:00.000Z"
+  },
+  "Ghfast": {
+    "successCount": 5,
+    "failureCount": 2,
+    "totalTime": 90000,
+    "lastUsed": "2025-09-07T12:00:00.000Z"
+  },
+  "GitHub": {
+    "successCount": 1,
+    "failureCount": 20,
+    "totalTime": 60000,
+    "lastUsed": "2025-09-06T18:00:00.000Z"
+  }
+}

@@ -1,0 +1,30 @@
+# ===================================================================
+# |                          外部插件路径                            |
+# ===================================================================
+
+# Miao-Plugin
+miao:
+  # 图片同步的目标目录
+  syncTarget: "plugins/miao-plugin/resources/profile/normal-character"
+  # 原神文件目录
+  gsAliasDir: "plugins/miao-plugin/resources/meta-gs/character"
+  # 星穹铁道文件目录
+  srAliasDir: "plugins/miao-plugin/resources/meta-sr/character"
+
+# ZZZ-Plugin
+zzz:
+  # 图片同步的目标目录
+  syncTarget: "plugins/ZZZ-Plugin/resources/images/panel"
+  # 文件目录
+  aliasDir: "plugins/ZZZ-Plugin/defset"
+  # 角色数据文件目录
+  dataDir: "plugins/ZZZ-Plugin/resources/data/hakush/data/character"
+  # 角色头像文件目录
+  faceDir: "plugins/ZZZ-Plugin/resources/images/role_circle"
+
+# Waves-Plugin
+waves:
+  # 图片同步的目标目录
+  syncTarget: "plugins/waves-plugin/resources/rolePic"
+  # 文件目录
+  aliasDir: "plugins/waves-plugin/resources/Alias"

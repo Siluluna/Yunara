@@ -1,0 +1,53 @@
+# Yunara Git 服务核心配置
+
+# ===================================================================
+# |                         超时与性能设置                           |
+# ===================================================================
+
+# 节点 HTTP 连通性测试的超时时间 (毫秒)
+ProxyTestTimeout: 5000
+
+# `git ls-remote` 命令的超时时间 (毫秒)
+GitLsRemoteTimeout: 20000
+
+# `git clone` 命令的超时时间 (毫秒)
+GitCloneTimeout: 900000 # 15 分钟
+
+# `git pull` / `git fetch` 等更新命令的超时时间 (毫秒)
+GitPullTimeout: 120000 # 2 分钟
+
+# 克隆深度
+GitCloneDepth: 1
+
+
+# ===================================================================
+# |                           GitHub 加速节点                         |
+# ===================================================================
+
+Proxies:
+  - { name: "Moeyy",         priority: 0,    url: "https://github.moeyy.xyz" }
+  - { name: "Ghfast",        priority: 10,   url: "https://ghfast.top" }
+  - { name: "FastGit",       priority: 12,   url: "https://hub.fastgit.xyz" }
+  - { name: "GhLLKK",        priority: 15,   url: "https://gh.llkk.cc" }
+  - { name: "GhproxyCom",    priority: 18,   url: "https://ghproxy.com" }
+  - { name: "MirrorGhproxy", priority: 22,   url: "https://mirror.ghproxy.com" }
+  - { name: "GhproxyNet",    priority: 25,   url: "https://gh-proxy.net" }
+  - { name: "UiGhproxy",     priority: 28,   url: "https://ui.ghproxy.cc" }
+  - { name: "GhApi999",      priority: 30,   url: "https://gh.api.99988866.xyz" }
+  - { name: "GhproxyGo",     priority: 35,   url: "https://ghproxy.1888866.xyz" }
+  - { name: "KGitHub",       priority: 42,   url: "https://kgithub.com" }
+  - { name: "HubNUAA",       priority: 45,   url: "https://hub.nuaa.cf" }
+  - { name: "HubFGit",       priority: 48,   url: "https://hub.fgit.ml" }
+  - { name: "Ghp",           priority: 60,   url: "https://ghp.ci" }
+  - { name: "Ghgo",          priority: 60,   url: "https://ghgo.xyz" }
+  - { name: "Yumenaka",      priority: 70,   url: "https://git.yumenaka.net" }
+  - { name: "GhConSh",       priority: 75,   url: "https://gh.con.sh" }
+  - { name: "GhddlcTop",     priority: 80,   url: "https://gh.ddlc.top" }
+  - { name: "SdutGit",       priority: 90,   url: "https://git.sdut.me" }
+  - { name: "GhpsCc",        priority: 300,  url: "https://ghps.cc" }
+  
+  # --- 特殊规则节点 ---
+  - { name: "Mirror",        priority: 310,  url: "https://hub.gitmirror.com" }
+  - { name: "GitHub",        priority: 500,  url: "https://github.com" }
+  # GitClone: 仅用于 clone，无 testUrl
+  - { name: "GitClone",      priority: 520,  url: "https://gitclone.com" }
