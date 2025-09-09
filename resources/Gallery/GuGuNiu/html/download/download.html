@@ -5,8 +5,7 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>咕咕牛下载报告</title>
-	<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC&family=Orbitron:wght@400;500;700&family=Rajdhani:wght@500;700&display=swap"
-		rel="stylesheet">
+	<link rel="stylesheet" href="{{Yunara_Res_Path}}fonts/Orbitron-Medium.woff2">
 	<style>
 		:root {
 			--panel-bg: rgba(26, 32, 44, 0.75);
@@ -63,6 +62,7 @@
 			left: 0;
 			right: 0;
 			bottom: 0;
+			/* [修改] 背景图路径也使用注入的变量 */
 			background-image: url('{{yunara_res_path}}GuGuNiu/img/downloadbg.png');
 			background-size: cover;
 			background-position: center center;
@@ -385,7 +385,7 @@
 				<div class="rating-bar">
 					<span class="stars">{{'★'.repeat(successCount)}}{{'☆'.repeat(totalConfigured-successCount)}}</span> {{ successCount }}/{{ totalConfigured }} 成功
 				</div>
-				<h1 class="title">咕咕牛的下载报告 <span>/IDOWNLOADI/</span></h1>
+				<h1 class="title">咕咕牛的下载报告 <span>/DOWNLOAD/</span></h1>
 				<div class="progress-container">
 					<div class="progress-bar">
 						<div class="progress-bar-fill" style="width: {{ successRate }}%;"></div>
@@ -428,7 +428,7 @@
 			</main>
 
 			<footer class="footer">
-				Miao-Plugin-MBT v{{ pluginVersion }} <span class="duration">[耗时: {{ duration }}s]</span>
+				Yunara v{{ pluginVersion }} <span class="duration">[耗时: {{ duration }}s]</span>
 			</footer>
 		</div>
 
@@ -437,6 +437,11 @@
 			<div class="bracket-tab">INFO</div>
 		</div>
 	</div>
+	<script>
+		Promise.all(Array.from(document.images).filter(img => !img.complete).map(img => new Promise(resolve => { img.onload = img.onerror = resolve; }))).then(() => {
+			window.yunaraRenderReady = true;
+		});
+	</script>
 </body>
 
 </html>

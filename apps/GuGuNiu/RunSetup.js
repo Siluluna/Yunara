@@ -5,9 +5,35 @@ import { config } from '#Yunara/utils/Config';
 import { git } from '#Yunara/utils/Git';
 import { data } from '#Yunara/utils/Data';
 import { file } from '#Yunara/utils/File';
-import { Yunara_Repos_Path, Yunzai_Path } from '#Yunara/utils/Path';
+import { Yunara_Repos_Path, Yunzai_Path, Yunara_Res_Path } from '#Yunara/utils/Path';
 
 const logger = createLogger('Yunara:GuGuNiu:RunSetup');
+
+let imageDataCache = null;
+
+async function loadImageData() {
+    if (imageDataCache) return imageDataCache;
+    try {
+        const filePath = path.join(Yunara_Res_Path, 'Gallery', 'GuGuNiu', 'ImageData.json');
+        const content = await fs.readFile(filePath, 'utf-8');
+        const rawData = JSON.parse(content);
+
+        if (!Array.isArray(rawData)) {
+            logger.error("ImageData.json 内容不是一个有效的数组。");
+            return [];
+        }
+
+        const validData = rawData.filter(item => {
+            return item && typeof item.path === 'string' && typeof item.storagebox === 'string';
+        }).map(item => ({ ...item, path: item.path.replace(/\\/g, "/") }));
+        
+        imageDataCache = validData;
+        return validData;
+    } catch (error) {
+        logger.error("加载 ImageData.json 失败:", error);
+        return [];
+    }
+}
 
 const setupManager = {
   async runPostDownloadSetup(e) {
@@ -19,13 +45,15 @@ const setupManager = {
 
   async runPostUpdateSetup(e) {
     logger.info("开始执行更新后设置流程...");
+    imageDataCache = null;
     await this._performSyncing({ isInitialSync: false });
     logger.info("更新后设置流程全部完成。");
   },
 
   async _performSyncing({ isInitialSync }) {
-    const allImageData = await data.getImageData(true);
+    const allImageData = await loadImageData();
     let userBans = new Set();
+    
     if (isInitialSync) {
       logger.info(`已加载 ${allImageData.length} 条元数据。`);
     } else {
@@ -70,11 +98,10 @@ const setupManager = {
     const MANIFEST_KEY = 'runtime.syncManifest';
     const previousManifest = await data.get(MANIFEST_KEY, []);
     const newManifest = [];
-    
     const externalPlugins = await config.get('externalPlugins') || {};
     const targetPaths = {
       gs: externalPlugins.miao?.syncTarget ? path.join(Yunzai_Path, externalPlugins.miao.syncTarget) : null,
-      sr: externalPlugins.miao?.syncTarget ? path.join(Yunzai_Path, externalPlugins.miao.syncTarget) : null, 
+      sr: externalPlugins.miao?.syncTarget ? path.join(Yunzai_Path, externalPlugins.miao.syncTarget) : null,
       zzz: externalPlugins.zzz?.syncTarget ? path.join(Yunzai_Path, externalPlugins.zzz.syncTarget) : null,
       waves: externalPlugins.waves?.syncTarget ? path.join(Yunzai_Path, externalPlugins.waves.syncTarget) : null,
     };
@@ -152,4 +179,4 @@ const setupManager = {
   }
 };
 
-export { setupManager }
+export { setupManager };

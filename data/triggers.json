@@ -1,0 +1,191 @@
+[
+  {
+    "id": 1,
+    "name": "Git 操作失败 (认证/访问)",
+    "category": "底层错误",
+    "description": "模拟 Git 命令认证失败或无权限。预期：命令失败，ReportError报告。",
+    "type": "THROW_GIT_AUTH_FAIL"
+  },
+  {
+    "id": 2,
+    "name": "网络连接/超时失败",
+    "category": "底层错误",
+    "description": "模拟通用网络请求超时。预期：相关操作失败，ReportError报告。",
+    "type": "THROW_NET_TIMEOUT"
+  },
+  {
+    "id": 3,
+    "name": "FS: 权限错误 (EACCES)",
+    "category": "底层错误",
+    "description": "模拟文件系统无写入/读取权限。预期：相关FS操作失败，ReportError报告。",
+    "type": "THROW_FS_EACCES"
+  },
+  {
+    "id": 4,
+    "name": "FS: 路径未找到 (ENOENT)",
+    "category": "底层错误",
+    "description": "模拟访问不存在的文件或目录。预期：相关FS操作失败，ReportError报告。",
+    "type": "THROW_FS_ENOENT"
+  },
+  {
+    "id": 5,
+    "name": "截图: 模板数据错误",
+    "category": "底层错误",
+    "description": "模拟Puppeteer渲染时模板数据缺失或错误。预期：截图失败，ReportError报告。",
+    "type": "THROW_RENDER_TEMPLATE_DATA_ERROR"
+  },
+  {
+    "id": 6,
+    "name": "截图: 渲染超时",
+    "category": "底层错误",
+    "description": "模拟Puppeteer截图操作超时。预期：截图失败，ReportError报告。",
+    "type": "THROW_RENDER_TIMEOUT"
+  },
+  {
+    "id": 7,
+    "name": "配置: YAML解析失败",
+    "category": "底层错误",
+    "description": "模拟GalleryConfig.yaml格式错误。预期：配置加载失败，ReportError或日志。",
+    "type": "THROW_YAML_PARSE"
+  },
+  {
+    "id": 8,
+    "name": "数据: JSON解析失败",
+    "category": "底层错误",
+    "description": "模拟ImageData.json或banlist.json格式错误。预期：数据加载失败，ReportError或日志。",
+    "type": "THROW_JSON_PARSE"
+  },
+  {
+    "id": 9,
+    "name": "通用: 调用未知变量",
+    "category": "底层错误",
+    "description": "模拟代码中引用一个未定义的变量，触发ReferenceError。",
+    "type": "THROW_REFERENCE_ERROR"
+  },
+  {
+    "id": 10,
+    "name": "通用: 未知底层错误",
+    "category": "底层错误",
+    "description": "模拟一个未分类的底层异常。预期：ReportError报告。",
+    "type": "THROW_GENERIC_ERROR"
+  },
+  {
+    "id": 11,
+    "name": "资源同步失败 (文件丢失)",
+    "category": "底层错误",
+    "description": "模拟核心库下载后，同步公共资源时发现文件丢失。预期：显示专属的文件丢失报告图。",
+    "type": "THROW_SYNC_FILES_FAILED"
+  },
+  {
+    "id": 12,
+    "name": "下载流程: 核心库下载失败",
+    "category": "底层错误",
+    "description": "模拟核心库所有节点均下载失败，以测试顶层错误和日志捕获。",
+    "type": "TRIGGER_DOWNLOAD_FAILURE"
+  },
+  {
+    "id": 13,
+    "name": "错误报告: 附带精确日志",
+    "category": "核心图片报告模拟",
+    "description": "伪造一个带时间戳的错误，测试ReportError附加日志功能。",
+    "type": "SIMULATE_ERROR_WITH_LOG_CONTEXT"
+  },
+  {
+    "id": 14,
+    "name": "下载流程: 模拟 TypeError 并捕获状态上下文",
+    "category": "核心图片报告模拟",
+    "description": "在下载流程中模拟一个 TypeError，测试顶层 catch 块是否能捕获并上报当时所有仓库的状态快照。",
+    "type": "TRIGGER_DOWNLOAD_TYPEERROR_WITH_CONTEXT"
+  },
+  {
+    "id": 15,
+    "name": "错误报告: 模拟 Git 失败并展示完整技术细节",
+    "category": "核心图片报告模拟",
+    "description": "模拟一个包含 code 和 signal 的 Git 命令执行失败，测试错误报告能否展示完整的错误摘要信息。",
+    "type": "TRIGGER_GIT_FAIL_WITH_FULL_DETAILS"
+  },
+  {
+    "id": 21,
+    "name": "报告: 下载完成-混合结果",
+    "category": "核心图片报告模拟",
+    "description": "生成并发送一张模拟的“下载完成报告”：核心库成功，一个附属库失败，一个已存在。",
+    "type": "SIM_TPL_DL_REPORT_MIXED_REMOTE"
+  },
+  {
+    "id": 22,
+    "name": "报告: 下载完成-全部失败",
+    "category": "核心图片报告模拟",
+    "description": "生成并发送一张模拟的“下载完成报告”：所有尝试的仓库均下载失败。",
+    "type": "SIM_TPL_DL_REPORT_FAIL_REMOTE"
+  },
+  {
+    "id": 23,
+    "name": "报告: 下载完成-全部成功",
+    "category": "核心图片报告模拟",
+    "description": "生成并发送一张模拟的“下载完成报告”：所有配置的仓库均下载成功。",
+    "type": "SIM_TPL_DL_REPORT_SUCCESS_REMOTE"
+  },
+  {
+    "id": 30,
+    "name": "更新报告: 全部已是最新",
+    "category": "核心图片报告模拟",
+    "description": "模拟所有仓库均已是最新，无任何文件变更。",
+    "type": "SIM_TPL_UP_REPORT_NOCHANGE_LOCAL"
+  },
+  {
+    "id": 31,
+    "name": "更新报告: 核心有变，附属无变",
+    "category": "核心图片报告模拟",
+    "description": "模拟核心库有新的常规更新，附属库无变化。",
+    "type": "SIM_TPL_UP_REPORT_CORE_CHANGE_LOCAL"
+  },
+  {
+    "id": 32,
+    "name": "更新报告: 核心强制同步",
+    "category": "核心图片报告模拟",
+    "description": "模拟核心库因冲突被强制同步(reset --hard)。",
+    "type": "SIM_TPL_UP_REPORT_FORCE_SYNC_LOCAL"
+  },
+  {
+    "id": 33,
+    "name": "更新报告: 核心失败，附属成功",
+    "category": "核心图片报告模拟",
+    "description": "模拟核心库更新失败，附属库更新成功。",
+    "type": "SIM_TPL_UP_REPORT_CORE_FAIL_LOCAL"
+  },
+  {
+    "id": 34,
+    "name": "更新报告: 全部失败",
+    "category": "核心图片报告模拟",
+    "description": "模拟所有仓库均更新失败。",
+    "type": "SIM_TPL_UP_REPORT_ALL_FAIL_LOCAL"
+  },
+  {
+    "id": 35,
+    "name": "更新报告: 全部有变",
+    "category": "核心图片报告模拟",
+    "description": "模拟所有配置的仓库均有新的常规更新。",
+    "type": "SIM_TPL_UP_REPORT_ALL_CHANGES_LOCAL"
+  },
+  {
+    "id": 36,
+    "name": "更新报告: 自动切换节点成功",
+    "category": "核心图片报告模拟",
+    "description": "模拟核心库更新失败后，自动切换到Ghfast节点并成功更新。",
+    "type": "SIM_TPL_UP_REPORT_AUTOSWITCH_SUCCESS_LOCAL"
+  },
+  {
+    "id": 37,
+    "name": "更新报告: 自动切换节点后仍失败",
+    "category": "核心图片报告模拟",
+    "description": "模拟核心库更新失败，自动切换节点后再次失败。",
+    "type": "SIM_TPL_UP_REPORT_AUTOSWITCH_FAIL_LOCAL"
+  },
+  {
+    "id": 38,
+    "name": "更新报告: 失败并生成详细错误消息",
+    "category": "核心图片报告模拟",
+    "description": "模拟核心库更新失败，并触发生成详细的合并转发错误报告。",
+    "type": "SIM_UPDATE_FAIL_WITH_DETAILS"
+  }
+]

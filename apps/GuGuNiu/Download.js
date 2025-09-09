@@ -1,11 +1,11 @@
 import path from "node:path";
 import lodash from "lodash";
-import plugin from '../../../../lib/plugins/plugin.js';
-import common from '../../../../lib/common/common.js';
+import plugin from '../../../../lib/plugin/plugin.js';
 import { git } from '#Yunara/utils/Git';
 import { config } from '#Yunara/utils/Config';
 import { createLogger } from '#Yunara/utils/Logger';
-import { Yunara_Repos_Path } from '#Yunara/utils/Path';
+import { renderer } from '#Yunara/utils/Renderer';
+import { Yunara_Repos_Path, Yunara_Res_Path } from '#Yunara/utils/Path';
 import { setupManager } from './RunSetup.js';
 
 const logger = createLogger('Yunara:GuGuNiu:Download');
@@ -28,6 +28,7 @@ export class GuGuNiuDownload extends plugin {
   }
 
   DownloadTuKu = async (e) => {
+    const startTime = Date.now();
     const commandName = "DownloadTuKu";
     const cooldownKey = `Yunara:GuGuNiu:${commandName}:${e.user_id}`;
     const cooldownSeconds = 120;
@@ -69,23 +70,17 @@ export class GuGuNiuDownload extends plugin {
 
       const downloadPromises = reposToDownload.map(repo => {
         progressTracker[repo.description].status = '下载中...';
-        
         const callbacks = {
           onProgress: (percent, resetTimeoutFn) => {
             progressTracker[repo.description].percent = percent;
-            
             if (percent >= progressTracker[repo.description].lastLoggedPercent + 5) {
               const progressMsg = `${repo.description}: ${percent}%`;
               logger.info(`下载进度: ${progressMsg}`);
               progressTracker[repo.description].lastLoggedPercent = percent;
             }
-            // TODO: 未来通过事件总线将实时进度发送给 WebUI
-            // eventBus.emit('download:progress', { repo: repo.description, percent });
-
             if (resetTimeoutFn) resetTimeoutFn();
           }
         };
-
         return git.cloneRepo({
           repoUrl: repo.url,
           localPath: repo.localPath,
@@ -100,31 +95,10 @@ export class GuGuNiuDownload extends plugin {
       const successfulDownloads = results.filter(r => r.success);
       if (successfulDownloads.length > 0) {
         await e.reply("仓库下载完成，开始执行安装设置与文件同步...", true);
-        await setupManager.runPostDownloadSetup(e, successfulDownloads);
+        await setupManager.runPostDownloadSetup(e);
       }
 
-      let successCount = 0;
-      const summary = ["咕咕牛图库下载任务完成！"];
-      results.forEach(data => {
-        if (data.success) {
-          summary.push(`✅ [${data.description}] 成功 (节点: ${data.nodeName})`);
-          successCount++;
-        } else {
-          summary.push(`❌ [${data.description}] 失败`);
-          logger.error(`仓库 [${data.description}] 下载失败:`, data.error);
-        }
-      });
-      summary.push("--------------------");
-      summary.push(`总结: ${successCount} / ${reposToDownload.length} 个仓库成功。`);
-      await e.reply(await common.makeForwardMsg(e, summary, '下载报告'));
-
-      if (successCount === reposToDownload.length) {
-        await e.reply("所有新仓库均已下载并部署成功！", true);
-      } else if (successCount > 0) {
-        await e.reply("部分仓库下载成功并已部署。请检查报告了解失败详情。", true);
-      } else {
-        await e.reply("所有下载任务均失败，请检查控制台日志获取详细错误信息。", true);
-      }
+      await this._renderFinalReport(e, results, reposToProcess, startTime);
 
     } catch (error) {
       logger.fatal("执行 #下载咕咕牛 指令时发生顶层异常:", error);
@@ -133,5 +107,67 @@ export class GuGuNiuDownload extends plugin {
       await redis.del(cooldownKey);
     }
     return true;
+  }
+
+  async _renderFinalReport(e, downloadResults, allRepos, startTime) {
+    const totalConfigured = allRepos.length;
+    const newDownloadsCount = downloadResults.length;
+    const successfulNewDownloadsCount = downloadResults.filter(r => r.success).length;
+    const preExistingCount = totalConfigured - newDownloadsCount;
+    const totalSuccessCount = successfulNewDownloadsCount + preExistingCount;
+    
+    const overallSuccess = successfulNewDownloadsCount === newDownloadsCount;
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    const settings = await config.get('guguniu.settings') || {};
+
+    const reportResults = allRepos.map(repo => {
+        const downloadInfo = downloadResults.find(r => r.id === repo.id);
+        if (downloadInfo) {
+            return {
+                text: downloadInfo.success ? '下载成功' : '下载失败',
+                statusClass: downloadInfo.success ? 'status-ok' : 'status-fail',
+                nodeName: downloadInfo.nodeName || 'N/A',
+                description: repo.description,
+            };
+        } else {
+            return {
+                text: '已存在',
+                statusClass: 'status-local',
+                nodeName: '本地',
+                description: repo.description,
+            };
+        }
+    });
+
+    const renderData = {
+      results: reportResults,
+      successCount: totalSuccessCount,
+      totalConfigured: totalConfigured,
+      successRate: totalConfigured > 0 ? Math.round((totalSuccessCount / totalConfigured) * 100) : 0,
+      successRateRounded: totalConfigured > 0 ? Math.round((totalSuccessCount / totalConfigured) * 100) : 0,
+      overallSuccess: overallSuccess,
+      duration: duration,
+      pluginVersion: '3.1',
+      scaleStyleValue: `transform:scale(${ (settings.RenderScale || 100) / 100 }); transform-origin: top left;`,
+      yunara_res_path: `file://${Yunara_Res_Path.replace(/\\/g, '/')}/`
+    };
+
+    const templatePath = path.join(Yunara_Res_Path, 'Gallery/GuGuNiu/html/download/download.html');
+    
+    try {
+        const imageBuffer = await renderer.render({
+            templatePath: templatePath,
+            data: renderData,
+        });
+
+        if (imageBuffer) {
+            await e.reply(imageBuffer);
+        } else {
+            throw new Error("渲染器返回了空的 Buffer。");
+        }
+    } catch (renderError) {
+        logger.error("下载报告渲染失败:", renderError);
+        await e.reply("下载报告图片生成失败，请查看控制台日志。");
+    }
   }
 }

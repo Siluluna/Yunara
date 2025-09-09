@@ -1,15 +1,16 @@
+// 文件路径: /plugins/Yunara/utils/Data.js
+
 import path from "node:path";
 import fs from "node:fs/promises";
 import lodash from "lodash";
 import { createLogger } from "#Yunara/utils/Logger";
-import { Yunara_Data_Path } from "#Yunara/utils/Path";
+import { Yunara_Data_Path } from "#Yunara/utils/Path"; // 使用你的命名规范
 
 const logger = createLogger("Yunara:Utils:Data");
 
 const JSON_FILES = {
   runtime: path.join(Yunara_Data_Path, "yunara_runtime.json"),
   userBans: path.join(Yunara_Data_Path, "guguniu_bans.json"),
-  imageData: path.join(Yunara_Data_Path, "GuGuNiu", "ImageData.json"),
 };
 
 class DataService {
@@ -29,11 +30,10 @@ class DataService {
           this.#cache[fileKey] = JSON.parse(fileContent);
         } catch (error) {
           if (error.code === 'ENOENT') {
-            logger.warn(`数据文件 ${JSON_FILES[fileKey]} 不存在，将初始化为空值。`);
-            this.#cache[fileKey] = (fileKey === 'userBans' || fileKey === 'imageData') ? [] : {};
+            this.#cache[fileKey] = fileKey === 'userBans' ? [] : {};
           } else {
             logger.error(`读取或解析数据文件 ${JSON_FILES[fileKey]} 失败：`, error);
-            this.#cache[fileKey] = (fileKey === 'userBans' || fileKey === 'imageData') ? [] : {};
+            this.#cache[fileKey] = fileKey === 'userBans' ? [] : {};
           }
         } finally {
           this.#locks.delete(fileKey);
@@ -79,7 +79,7 @@ class DataService {
 
   async #saveJsonFile(fileKey) {
     const filePath = JSON_FILES[fileKey];
-    const dataToSave = this.#cache[fileKey] || ((fileKey === 'userBans' || fileKey === 'imageData') ? [] : {});
+    const dataToSave = this.#cache[fileKey] || (fileKey === 'userBans' ? [] : {});
     try {
       const jsonString = JSON.stringify(dataToSave, null, 2);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -87,38 +87,6 @@ class DataService {
     } catch (error) {
       logger.error(`写入数据文件 ${filePath} 失败:`, error);
     }
-  }
-
-  async getImageData(forceReload = false) {
-    const fileKey = 'imageData';
-    if (forceReload || !this.#cache[fileKey]) {
-      await this.#loadJsonFile(fileKey);
-    }
-    
-    const rawData = this.#cache[fileKey] || [];
-    if (!Array.isArray(rawData)) {
-        logger.error("ImageData.json 内容不是一个有效的数组，将返回空数组。");
-        return [];
-    }
-
-    const validData = rawData.filter(item => {
-        const isBasicValid = item && typeof item.path === 'string' && item.path.trim() !== "" &&
-          typeof item.characterName === 'string' && item.characterName.trim() !== "" &&
-          typeof item.attributes === 'object' &&
-          typeof item.storagebox === 'string' && item.storagebox.trim() !== "";
-        if (!isBasicValid) return false;
-        
-        const pathRegex = /^[a-z]+-character\/[^/]+\/[^/]+\.webp$/i;
-        const normalizedPath = item.path.replace(/\\/g, "/");
-        return pathRegex.test(normalizedPath);
-    }).map(item => ({ ...item, path: item.path.replace(/\\/g, "/") }));
-
-    if (rawData.length > 0 && validData.length === 0) {
-        logger.warn("ImageData.json 中似乎没有符合当前格式要求的数据。");
-    }
-
-    this.#cache[fileKey] = validData;
-    return validData;
   }
 }
 
