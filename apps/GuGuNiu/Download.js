@@ -1,6 +1,6 @@
 import path from "node:path";
 import lodash from "lodash";
-import plugin from '../../../../lib/plugin/plugin.js';
+import plugin from '../../../../lib/plugins/plugin.js';
 import { git } from '#Yunara/utils/Git';
 import { config } from '#Yunara/utils/Config';
 import { createLogger } from '#Yunara/utils/Logger';
