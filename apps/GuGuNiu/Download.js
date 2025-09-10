@@ -1,11 +1,11 @@
 import path from "node:path";
-import lodash from "lodash";
 import plugin from '../../../../lib/plugins/plugin.js';
-import { git } from '#Yunara/utils/Git';
+import { version } from '#Yunara/utils/Version';
+import { GuGuNiuRepository } from '#Yunara/models/GuGuNiu/Repository';
 import { config } from '#Yunara/utils/Config';
 import { createLogger } from '#Yunara/utils/Logger';
 import { renderer } from '#Yunara/utils/Renderer';
-import { Yunara_Repos_Path, Yunara_Res_Path } from '#Yunara/utils/Path';
+import { Yunara_Res_Path } from '#Yunara/utils/Path';
 import { setupManager } from './RunSetup.js';
 
 const logger = createLogger('Yunara:GuGuNiu:Download');
@@ -30,35 +30,29 @@ export class GuGuNiuDownload extends plugin {
   DownloadTuKu = async (e) => {
     const startTime = Date.now();
     const commandName = "DownloadTuKu";
-    const cooldownKey = `Yunara:GuGuNiu:${commandName}:${e.user_id}`;
+    const cooldownKey = `Yunara:GuGuNiu:${commandName}:${e.user_id}`;51
     const cooldownSeconds = 120;
 
     try {
       const ttl = await redis.ttl(cooldownKey);
       if (ttl > 0) {
-        return e.reply(`该指令冷却中，剩余 ${ttl} 秒。`, true);
+        return e.reply(`该指令冷却中，剩余 ${ttl} 秒`, true);
       }
       await redis.set(cooldownKey, '1', { EX: cooldownSeconds });
 
       await e.reply("收到！正在获取最新配置并检查本地仓库状态...", true);
 
-      const galleryConfig = await config.get('guguniu.gallery');
-      if (!galleryConfig || !Array.isArray(galleryConfig.repositories)) {
-        throw new Error("图库仓库配置 (GuGuNiu/Gallery.yaml) 缺失或格式错误。");
+      const allRepos = await GuGuNiuRepository.getAll();
+      if (allRepos.length === 0) {
+        throw new Error("图库仓库配置 (GuGuNiu/Gallery.yaml) 缺失或为空");
       }
 
-      const repoStatusPromises = galleryConfig.repositories.map(async (repo) => {
-        const repoName = path.basename(new URL(repo.url).pathname, '.git');
-        const localPath = path.join(Yunara_Repos_Path, repoName);
-        const isDownloaded = await git.isRepoDownloaded(localPath);
-        return { ...repo, localPath, isDownloaded };
-      });
-      const reposToProcess = await Promise.all(repoStatusPromises);
-      const reposToDownload = reposToProcess.filter(repo => !repo.isDownloaded);
+      const downloadedChecks = await Promise.all(allRepos.map(repo => repo.isDownloaded()));
+      const reposToDownload = allRepos.filter((_, index) => !downloadedChecks[index]);
 
       if (reposToDownload.length === 0) {
         await redis.del(cooldownKey);
-        return e.reply("所有已配置的图库均已存在于本地，无需下载。", true);
+        return e.reply("所有已配置的图库均已存在于本地，无需下载", true);
       }
 
       await e.reply(`检测到 ${reposToDownload.length} 个新仓库需要下载，任务已在后台开始...`, true);
@@ -74,19 +68,13 @@ export class GuGuNiuDownload extends plugin {
           onProgress: (percent, resetTimeoutFn) => {
             progressTracker[repo.description].percent = percent;
             if (percent >= progressTracker[repo.description].lastLoggedPercent + 5) {
-              const progressMsg = `${repo.description}: ${percent}%`;
-              logger.info(`下载进度: ${progressMsg}`);
+              logger.info(`下载进度: ${repo.description}: ${percent}%`);
               progressTracker[repo.description].lastLoggedPercent = percent;
             }
             if (resetTimeoutFn) resetTimeoutFn();
           }
         };
-        return git.cloneRepo({
-          repoUrl: repo.url,
-          localPath: repo.localPath,
-          branch: repo.branch,
-          callbacks: callbacks,
-        }).then(result => ({ ...repo, ...result }))
+        return repo.download(callbacks)
          .catch(error => ({ ...repo, success: false, error }));
       });
 
@@ -98,7 +86,7 @@ export class GuGuNiuDownload extends plugin {
         await setupManager.runPostDownloadSetup(e);
       }
 
-      await this._renderFinalReport(e, results, reposToProcess, startTime);
+      await this._renderFinalReport(e, results, allRepos, startTime);
 
     } catch (error) {
       logger.fatal("执行 #下载咕咕牛 指令时发生顶层异常:", error);
@@ -111,8 +99,8 @@ export class GuGuNiuDownload extends plugin {
 
   async _renderFinalReport(e, downloadResults, allRepos, startTime) {
     const totalConfigured = allRepos.length;
-    const newDownloadsCount = downloadResults.length;
     const successfulNewDownloadsCount = downloadResults.filter(r => r.success).length;
+    const newDownloadsCount = downloadResults.length;
     const preExistingCount = totalConfigured - newDownloadsCount;
     const totalSuccessCount = successfulNewDownloadsCount + preExistingCount;
     
@@ -147,12 +135,12 @@ export class GuGuNiuDownload extends plugin {
       successRateRounded: totalConfigured > 0 ? Math.round((totalSuccessCount / totalConfigured) * 100) : 0,
       overallSuccess: overallSuccess,
       duration: duration,
-      pluginVersion: '3.1',
+      pluginVersion: await version.get(),
       scaleStyleValue: `transform:scale(${ (settings.RenderScale || 100) / 100 }); transform-origin: top left;`,
       yunara_res_path: `file://${Yunara_Res_Path.replace(/\\/g, '/')}/`
     };
 
-    const templatePath = path.join(Yunara_Res_Path, 'Gallery/GuGuNiu/html/download/download.html');
+    const templatePath = path.join(Yunara_Res_Path, 'Gallery', 'GuGuNiu', 'html', 'download', 'download.html');
     
     try {
         const imageBuffer = await renderer.render({
@@ -163,11 +151,11 @@ export class GuGuNiuDownload extends plugin {
         if (imageBuffer) {
             await e.reply(imageBuffer);
         } else {
-            throw new Error("渲染器返回了空的 Buffer。");
+            throw new Error("渲染器返回了空的 Buffer");
         }
     } catch (renderError) {
         logger.error("下载报告渲染失败:", renderError);
-        await e.reply("下载报告图片生成失败，请查看控制台日志。");
+        await e.reply("下载报告图片生成失败，请查看控制台日志");
     }
   }
 }

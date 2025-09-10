@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import yaml from "yaml";
 import lodash from "lodash";
 import { createLogger } from "#Yunara/utils/Logger";
-import { YUNARA_CONFIG_PATH } from "#Yunara/utils/Path";
+import { Yunara_Config_Path } from "#Yunara/utils/Path";
 
 const logger = createLogger("Yunara:Utils:Config");
 
@@ -13,31 +13,31 @@ const logger = createLogger("Yunara:Utils:Config");
  */
 const CONFIG_FILES = {
   yunara: {
-    path: path.join(YUNARA_CONFIG_PATH, "Yunara.yaml"),
+    path: path.join(Yunara_Config_Path, "Yunara.yaml"),
     dataKey: "yunara"
   },
   git: {
-    path: path.join(YUNARA_CONFIG_PATH, "Git.yaml"),
+    path: path.join(Yunara_Config_Path, "Git.yaml"),
     dataKey: "git"
   },
   renderer: {
-    path: path.join(YUNARA_CONFIG_PATH, "Renderer.yaml"),
+    path: path.join(Yunara_Config_Path, "Renderer.yaml"),
     dataKey: "renderer"
   },
   externalPlugins: {
-    path: path.join(YUNARA_CONFIG_PATH, "Ex-Plugins.yaml"),
+    path: path.join(Yunara_Config_Path, "Ex-Plugins.yaml"),
     dataKey: "externalPlugins"
   },
   guguniu_gallery: {
-    path: path.join(YUNARA_CONFIG_PATH, "GuGuNiu", "Gallery.yaml"),
+    path: path.join(Yunara_Config_Path, "GuGuNiu", "Gallery.yaml"),
     dataKey: "guguniu.gallery"
   },
   guguniu_settings: {
-    path: path.join(YUNARA_CONFIG_PATH, "GuGuNiu", "Settings.yaml"),
+    path: path.join(Yunara_Config_Path, "GuGuNiu", "Settings.yaml"),
     dataKey: "guguniu.settings"
   },
   guguniu_webui: {
-    path: path.join(YUNARA_CONFIG_PATH, "GuGuNiu", "Webui.yaml"),
+    path: path.join(Yunara_Config_Path, "GuGuNiu", "Webui.yaml"),
     dataKey: "guguniu.webui"
   },
 };

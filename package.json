@@ -14,7 +14,8 @@
   ],
   "imports": {
     "#Yunara/apps/*": "./apps/*.js",
-    "#Yunara/utils/*": "./utils/*.js"
+    "#Yunara/utils/*": "./utils/*.js",
+    "#Yunara/models/*": "./models/*.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.1.2",

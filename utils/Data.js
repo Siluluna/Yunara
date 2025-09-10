@@ -1,10 +1,8 @@
-// 文件路径: /plugins/Yunara/utils/Data.js
-
 import path from "node:path";
 import fs from "node:fs/promises";
 import lodash from "lodash";
 import { createLogger } from "#Yunara/utils/Logger";
-import { Yunara_Data_Path } from "#Yunara/utils/Path"; // 使用你的命名规范
+import { Yunara_Data_Path } from "#Yunara/utils/Path";
 
 const logger = createLogger("Yunara:Utils:Data");
 
@@ -31,6 +29,7 @@ class DataService {
         } catch (error) {
           if (error.code === 'ENOENT') {
             this.#cache[fileKey] = fileKey === 'userBans' ? [] : {};
+            logger.warn(`数据文件 ${JSON_FILES[fileKey]} 不存在，将初始化为空值。`);
           } else {
             logger.error(`读取或解析数据文件 ${JSON_FILES[fileKey]} 失败：`, error);
             this.#cache[fileKey] = fileKey === 'userBans' ? [] : {};
@@ -73,7 +72,7 @@ class DataService {
         }
         lodash.set(this.#cache[fileKey], pathParts.join('.'), value);
     }
-    this.#saveJsonFile(fileKey);
+    await this.#saveJsonFile(fileKey);
     return true;
   }
 

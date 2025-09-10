@@ -16,7 +16,7 @@ export const Yunzai_Path = path.resolve(Yunara_Path, '..', '..');
 // ===================================================================
 export const Yunara_Data_Path = path.join(Yunara_Path, "data");
 export const Yunara_Config_Path = path.join(Yunara_Path, "config");
-export const YUNARA_LOGS_PATH = path.join(Yunara_Path, "logs");
+export const Yunara_logs_Path = path.join(Yunara_Path, "logs");
 export const Yunara_Repos_Path = path.join(Yunara_Path, "repos");
 export const Yunara_Res_Path = path.join(Yunara_Path, "resources");
 export const Yunara_Temp_Path = path.join(Yunara_Path, "temp");

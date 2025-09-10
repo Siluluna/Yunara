@@ -1,7 +1,7 @@
 import path from "node:path";
 import winston from "winston";
 import "winston-daily-rotate-file";
-import { YUNARA_LOGS_PATH } from "#Yunara/utils/Path";
+import { Yunara_logs_Path } from "#Yunara/utils/Path";
 
 const customLevels = {
   levels: {
@@ -103,16 +103,18 @@ const fileFormat = winston.format.combine(
   })
 );
 
+
 const loggers = new Map();
+let isExceptionHandlerRegistered = false;
 
 export function createLogger(namespace) {
   if (loggers.has(namespace)) {
     return loggers.get(namespace);
   }
 
-  const logDirectory = path.join(YUNARA_LOGS_PATH, namespace.replace(/:/g, path.sep));
+  const logDirectory = path.join(Yunara_logs_Path, namespace.replace(/:/g, path.sep));
 
-  const logger = winston.createLogger({
+  const loggerOptions = {
     levels: customLevels.levels,
     defaultMeta: { namespace },
     transports: [
@@ -131,23 +133,28 @@ export function createLogger(namespace) {
         maxFiles: "14d",
       }),
     ],
-    exceptionHandlers: [
+    exitOnError: false
+  };
+
+  if (!isExceptionHandlerRegistered) {
+    loggerOptions.exceptionHandlers = [
         new winston.transports.File({
             format: fileFormat,
-            dirname: logDirectory,
+            dirname: path.join(Yunara_logs_Path, '_exceptions'), 
             filename: 'exceptions.log'
         })
-    ],
-    rejectionHandlers: [
+    ];
+    loggerOptions.rejectionHandlers = [
         new winston.transports.File({
             format: fileFormat,
-            dirname: logDirectory,
+            dirname: path.join(Yunara_logs_Path, '_exceptions'), 
             filename: 'rejections.log'
         })
-    ],
-    exitOnError: false
-  });
+    ];
+    isExceptionHandlerRegistered = true;
+  }
 
+  const logger = winston.createLogger(loggerOptions);
   loggers.set(namespace, logger);
 
   return logger;
