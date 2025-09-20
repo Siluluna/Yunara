@@ -1,9 +1,9 @@
 import plugin from '../../../lib/plugins/plugin.js';
-import { createLogger } from '#Yunara/utils/Logger';
+import { createLogger } from '#Yunara/utils/logger';
 
 const logger = createLogger('Yunara:Admin');
 
-export class AdminPlugin extends plugin {
+export class Admin extends plugin {
   constructor() {
     super({
       name: 'Yunara管理',

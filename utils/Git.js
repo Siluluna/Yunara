@@ -1,38 +1,139 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import { createLogger } from "#Yunara/utils/Logger";
-import { process } from "#Yunara/utils/Process";
-import { file } from "#Yunara/utils/File";
-import { config } from "#Yunara/utils/Config";
-import { data } from "#Yunara/utils/Data";
-import { Yunara_Temp_Path } from "#Yunara/utils/Path";
+import { createLogger } from "#Yunara/utils/logger";
+import { processService } from "#Yunara/utils/process";
+import { file } from "#Yunara/utils/file";
+import { config } from "#Yunara/utils/config";
+import { data } from "#Yunara/utils/data";
+import { Yunara_Temp_Path } from "#Yunara/utils/path";
 
 const logger = createLogger("Yunara:Utils:Git");
 
 class GitService {
+  async _deliverRepo(tempPath, finalPath, gitConfig) {
+    logger.debug(`开始交付仓库: ${path.basename(tempPath)} -> ${path.basename(finalPath)}`);
+    
+    const delay = gitConfig.PostCloneDelay || 2000;
+    logger.debug(`等待 ${delay}ms 以释放文件锁...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    const deleted = await file.safeDelete(finalPath);
+    if (!deleted) {
+      throw new Error(`无法清理旧的目标目录 ${finalPath}，交付中止。`);
+    }
+
+    try {
+      await fs.mkdir(path.dirname(finalPath), { recursive: true });
+      await fs.rename(tempPath, finalPath);
+      logger.info(`仓库 [${path.basename(finalPath)}] 已通过快速重命名成功就位✅`);
+    } catch (renameError) {
+      if (renameError.code === 'EPERM' || renameError.code === 'EBUSY' || renameError.code === 'EXDEV') {
+        logger.warn(`仓库 [${path.basename(finalPath)}] 快速重命名失败 (${renameError.code})⚠️，启动备用方案 (逐文件复制)...`);
+        try {
+          await file.copy(tempPath, finalPath);
+          logger.info(`仓库 [${path.basename(finalPath)}] 已通过回退方案(I/O 复制)成功部署✅`);
+        } catch (copyError) {
+          logger.error(`仓库 [${path.basename(finalPath)}] 备用回退方案也失败了:`, copyError);
+          throw copyError;
+        }
+      } else {
+        throw renameError;
+      }
+    }
+  }
+
   async cloneRepo({ repoUrl, localPath, branch, callbacks = {} }) {
     const repoInfo = this._parseRepoUrl(repoUrl);
-    if (!repoInfo) {
-      throw new Error(`无法解析的仓库 URL 格式: ${repoUrl}`);
-    }
+    if (!repoInfo) throw new Error(`无法解析的仓库 URL 格式: ${repoUrl}`);
     const gitConfig = await config.get('git');
-    if (!gitConfig) {
-      throw new Error("Git 核心配置 (Git.yaml) 缺失。");
-    }
+    if (!gitConfig) throw new Error("Git 核心配置 (git.yaml) 缺失。");
+    
+    callbacks.repoInfo = repoInfo;
+
     if (repoInfo.platform === 'github') {
-      logger.debug(`检测到 GitHub，启动高级克隆...`);
       return this._cloneGitHubRepo({ repoUrl, localPath, branch, gitConfig, callbacks });
     } else {
-      logger.debug(`检测到 ${repoInfo.platform}，启动标准克隆...`);
       return this._cloneStandardRepo({ repoUrl, localPath, branch, gitConfig, callbacks });
     }
+  }
+  
+  async _cloneStandardRepo({ repoUrl, localPath, branch, gitConfig, callbacks }) {
+    const tempDownloadsBaseDir = path.join(Yunara_Temp_Path, "git-downloads");
+    const tempRepoPath = path.join(tempDownloadsBaseDir, `TempClone-${callbacks.repoInfo.repo}-Standard-${Date.now()}`);
+    
+    try {
+      await fs.mkdir(tempRepoPath, { recursive: true });
+      const cloneArgs = ["clone", "--verbose", `--depth=${gitConfig.GitCloneDepth}`, "-b", branch, repoUrl, tempRepoPath];
+      
+      await processService.execute({
+        command: "git",
+        args: cloneArgs,
+        options: {},
+        timeout: gitConfig.GitCloneTimeout,
+      });
+      
+      await this._deliverRepo(tempRepoPath, localPath, gitConfig);
+
+      return { success: true, nodeName: this._parseRepoUrl(repoUrl).platform, error: null };
+    } catch (error) {
+      throw error;
+    } finally {
+      await file.safeDelete(tempRepoPath);
+    }
+  }
+
+  async _downloadRepoWithFallback({ repoUrl, branch, localPath, sortedNodes, gitConfig, callbacks }) {
+    const tempDownloadsBaseDir = path.join(Yunara_Temp_Path, "git-downloads");
+    let lastError = null;
+
+    for (const node of sortedNodes) {
+      const tempRepoPath = path.join(tempDownloadsBaseDir, `TempClone-${callbacks.repoInfo.repo}-${node.name}-${Date.now()}`);
+      const startTime = Date.now();
+      
+      try {
+        const cloneUrl = this._constructCloneUrl(repoUrl, node);
+        if (!cloneUrl) continue;
+        
+        logger.info(`尝试使用节点 [${node.name}] 从 ${cloneUrl} 下载...`);
+        await fs.mkdir(tempRepoPath, { recursive: true });
+
+        const cloneArgs = ["clone", "--verbose", `--depth=${gitConfig.GitCloneDepth}`, "-b", branch, cloneUrl, tempRepoPath];
+        
+        await processService.execute({
+            command: "git",
+            args: cloneArgs,
+            options: {},
+            timeout: gitConfig.GitCloneTimeout,
+        });
+
+        const duration = Date.now() - startTime;
+        await this._updateNodeStats({ nodeName: node.name, success: true, duration });
+        
+        await this._deliverRepo(tempRepoPath, localPath, gitConfig);
+        
+        return { success: true, nodeName: node.name, error: null };
+
+      } catch (error) {
+        lastError = error; 
+        const duration = Date.now() - startTime;
+        await this._updateNodeStats({ nodeName: node.name, success: false, duration });
+        
+        logger.warn(`节点 [${node.name}] 下载失败: ${error.message}，切换到下一个节点...`);
+        
+      } finally {
+        await file.safeDelete(tempRepoPath);
+      }
+    }
+
+    logger.error("所有下载节点均尝试失败。");
+    throw lastError || new Error("所有下载节点均尝试失败");
   }
 
   async updateRepo({ localPath, branch, repoUrl }) {
     const repoInfo = this._parseRepoUrl(repoUrl);
     const gitConfig = await config.get('git');
     if (!gitConfig) {
-      throw new Error("Git 核心配置 (Git.yaml) 缺失。");
+      throw new Error("Git 核心配置 (git.yaml) 缺失。");
     }
     if (repoInfo?.platform === 'github') {
       logger.debug(`为 [${localPath}] 执行 GitHub 高级容错更新...`);
@@ -54,18 +155,11 @@ class GitService {
     }
   }
 
-  /**
-   * @public
-   * @description 管理仓库的 .git/info/exclude 文件规则。
-   * @param {string} repositoryPath 本地仓库路径
-   * @param {object} rules 操作规则, e.g., { add: ['dir/'], remove: ['file.log'] }
-   * @returns {Promise<boolean>}
-   */
   async manageExcludeRules(repositoryPath, { add, remove }) {
     const excludeFilePath = path.join(repositoryPath, ".git", "info", "exclude");
     try {
       await fs.access(path.join(repositoryPath, ".git"));
-      
+
       let existingRules = [];
       try {
         const fileContent = await fs.readFile(excludeFilePath, "utf-8");
@@ -107,97 +201,37 @@ class GitService {
     return this._downloadRepoWithFallback({ repoUrl, branch, localPath, sortedNodes, gitConfig, callbacks });
   }
 
-  async _cloneStandardRepo({ repoUrl, localPath, branch, gitConfig, callbacks }) {
-    const tempRepoPath = path.join(Yunara_Temp_Path, `TempClone-Standard-${Date.now()}`);
-    try {
-      await fs.mkdir(tempRepoPath, { recursive: true });
-      const cloneArgs = ["clone", "--verbose", `--depth=${gitConfig.GitCloneDepth}`, "--progress", "-b", branch, repoUrl, tempRepoPath];
-      await process.execute(
-        "git", cloneArgs, {}, 
-        gitConfig.GitCloneTimeout, 
-        callbacks.onStdOut, callbacks.onStdErr, callbacks.onProgress,
-        30000
-      );
-      await file.safeDelete(localPath);
-      await fs.mkdir(path.dirname(localPath), { recursive: true });
-      await fs.rename(tempRepoPath, localPath);
-      return { success: true, nodeName: this._parseRepoUrl(repoUrl).platform, error: null };
-    } catch (error) {
-      return { success: false, nodeName: this._parseRepoUrl(repoUrl).platform, error };
-    } finally {
-      await file.safeDelete(tempRepoPath);
-    }
-  }
-  
   async _updateGitHubRepo({ localPath, branch, repoUrl, gitConfig }) {
     const sortedNodes = await this._getSortedNodes(repoUrl, branch, gitConfig);
     if (!sortedNodes || sortedNodes.length === 0) {
-        logger.warn(`所有 GitHub 节点均不可用，将尝试使用本地配置的 remote origin 进行标准更新...`);
-        return this._updateStandardRepo({ localPath, branch, gitConfig });
+      logger.warn(`所有 GitHub 节点均不可用，将尝试使用本地配置的 remote origin 进行标准更新...`);
+      return this._updateStandardRepo({ localPath, branch, gitConfig });
     }
     logger.info(`GitHub 优选更新节点顺序: ${sortedNodes.map(n => `${n.name}(${n.score.toFixed(2)})`).join(' -> ')}`);
     for (const node of sortedNodes) {
-        const remoteUrl = this._constructCloneUrl(repoUrl, node);
-        const startTime = Date.now();
-        try {
-            logger.info(`尝试使用节点 [${node.name}] (${remoteUrl}) 更新...`);
-            await process.execute("git", ["remote", "set-url", "origin", remoteUrl], { cwd: localPath });
-            const result = await this._attemptUpdate({ localPath, branch, gitConfig });
-            const duration = Date.now() - startTime;
-            await this._updateNodeStats({ nodeName: node.name, success: result.success, duration });
-            if (result.success) {
-                return { ...result, nodeName: node.name };
-            }
-            logger.warn(`节点 [${node.name}] 更新失败:`, result.error.message);
-        } catch (error) {
-            const duration = Date.now() - startTime;
-            await this._updateNodeStats({ nodeName: node.name, success: false, duration });
-            logger.warn(`节点 [${node.name}] 设置 remote 或更新时出错:`, error.message);
-        }
-    }
-    return { success: false, nodeName: 'All Nodes Failed', error: new Error("所有优选节点更新均尝试失败") };
-  }
-  
-  async _updateStandardRepo({ localPath, branch, gitConfig }) {
-    return this._attemptUpdate({ localPath, branch, gitConfig });
-  }
-
-  async _downloadRepoWithFallback({ repoUrl, branch, localPath, sortedNodes, gitConfig, callbacks }) {
-    const tempDownloadsBaseDir = path.join(Yunara_Temp_Path, "git-downloads");
-    for (const node of sortedNodes) {
-      const cloneUrl = this._constructCloneUrl(repoUrl, node);
-      if (!cloneUrl) continue;
-      const tempRepoPath = path.join(tempDownloadsBaseDir, `TempClone-${node.name}-${Date.now()}`);
+      const remoteUrl = this._constructCloneUrl(repoUrl, node);
       const startTime = Date.now();
       try {
-        logger.info(`尝试使用节点 [${node.name}] 从 ${cloneUrl} 下载...`);
-        await fs.mkdir(tempRepoPath, { recursive: true });
-        const cloneArgs = ["clone", "--verbose", `--depth=${gitConfig.GitCloneDepth}`, "--progress", "-b", branch, cloneUrl, tempRepoPath];
-        await process.execute(
-            "git", cloneArgs, {}, 
-            gitConfig.GitCloneTimeout,
-            callbacks.onStdOut, callbacks.onStdErr, callbacks.onProgress,
-            30000
-        );
+        logger.info(`尝试使用节点 [${node.name}] (${remoteUrl}) 更新...`);
+        await processService.execute({ command: "git", args: ["remote", "set-url", "origin", remoteUrl], options: { cwd: localPath } });
+        const result = await this._attemptUpdate({ localPath, branch, gitConfig });
         const duration = Date.now() - startTime;
-        await this._updateNodeStats({ nodeName: node.name, success: true, duration });
-        await file.safeDelete(localPath);
-        await fs.mkdir(path.dirname(localPath), { recursive: true });
-        await fs.rename(tempRepoPath, localPath);
-        return { success: true, nodeName: node.name, error: null };
+        await this._updateNodeStats({ nodeName: node.name, success: result.success, duration });
+        if (result.success) {
+          return { ...result, nodeName: node.name };
+        }
+        logger.warn(`节点 [${node.name}] 更新失败:`, result.error.message);
       } catch (error) {
         const duration = Date.now() - startTime;
         await this._updateNodeStats({ nodeName: node.name, success: false, duration });
-        if (error.code === 'ETIMEDOUT') {
-            logger.warn(`节点 [${node.name}] 下载因无进展而超时，切换到下一个节点...`);
-        } else {
-            logger.error(`节点 [${node.name}] 下载时遇到致命错误:`, error.message);
-            return { success: false, nodeName: node.name, error };
-        }
-        await file.safeDelete(tempRepoPath);
+        logger.warn(`节点 [${node.name}] 设置 remote 或更新时出错:`, error.message);
       }
     }
-    return { success: false, nodeName: 'All Nodes Failed', error: new Error("所有下载节点均尝试失败") };
+    return { success: false, nodeName: 'All Nodes Failed', error: new Error("所有优选节点更新均尝试失败") };
+  }
+
+  async _updateStandardRepo({ localPath, branch, gitConfig }) {
+    return this._attemptUpdate({ localPath, branch, gitConfig });
   }
 
   _parseRepoUrl(repoUrl) {
@@ -207,8 +241,8 @@ class GitService {
       gitcode: /gitcode\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/,
     };
     for (const platform in patterns) {
-        const match = patterns[platform].exec(repoUrl);
-        if (match) return { platform, owner: match[1], repo: match[2] };
+      const match = patterns[platform].exec(repoUrl);
+      if (match) return { platform, owner: match[1], repo: match[2] };
     }
     return { platform: 'unknown' };
   }
@@ -220,31 +254,31 @@ class GitService {
     const proxyTestTimeout = gitConfig.ProxyTestTimeout || 5000;
     const testFile = 'README.md';
     const promises = proxies.map(async (proxy) => {
-        if (proxy.name === 'GitClone') {
-            return { name: proxy.name, speed: Infinity, available: false, ...proxy };
-        }
-        let testUrl;
-        if (proxy.name === 'GitHub') {
-            testUrl = `https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/${testFile}`;
-        } else {
-            const cleanUrl = proxy.url.replace(/\/$/, '');
-            if (['Ghfast', 'GhproxyCom', 'MirrorGhproxy', 'GhproxyNet', 'UiGhproxy', 'GhApi999', 'GhproxyGo'].includes(proxy.name)) {
-                testUrl = `${cleanUrl}/https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/${testFile}`;
-            } else {
-                testUrl = `${cleanUrl}/raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/${testFile}`;
-            }
-        }
-        const start = Date.now();
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), proxyTestTimeout);
-            const response = await fetch(testUrl, { signal: controller.signal, cache: 'no-store' });
-            clearTimeout(timeoutId);
-            if (response.ok) {
-                return { name: proxy.name, speed: Date.now() - start, available: true, ...proxy };
-            }
-        } catch (e) { /* 忽略网络错误 */ }
+      if (proxy.name === 'GitClone') {
         return { name: proxy.name, speed: Infinity, available: false, ...proxy };
+      }
+      let testUrl;
+      if (proxy.name === 'GitHub') {
+        testUrl = `https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/${testFile}`;
+      } else {
+        const cleanUrl = proxy.url.replace(/\/$/, '');
+        if (['Ghfast', 'GhproxyCom', 'MirrorGhproxy', 'GhproxyNet', 'UiGhproxy', 'GhApi999', 'GhproxyGo'].includes(proxy.name)) {
+          testUrl = `${cleanUrl}/https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/${testFile}`;
+        } else {
+          testUrl = `${cleanUrl}/raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/${testFile}`;
+        }
+      }
+      const start = Date.now();
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), proxyTestTimeout);
+        const response = await fetch(testUrl, { signal: controller.signal, cache: 'no-store' });
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          return { name: proxy.name, speed: Date.now() - start, available: true, ...proxy };
+        }
+      } catch (e) { /* 忽略网络错误 */ }
+      return { name: proxy.name, speed: Infinity, available: false, ...proxy };
     });
     return Promise.all(promises);
   }
@@ -253,14 +287,19 @@ class GitService {
     const cloneUrl = this._constructCloneUrl(repoUrl, nodeConfig);
     if (!cloneUrl) return false;
     try {
-      await process.execute("git", ["ls-remote", "--heads", cloneUrl, branch], {}, gitConfig.GitLsRemoteTimeout);
+      await processService.execute({
+        command: "git",
+        args: ["ls-remote", "--heads", cloneUrl, branch],
+        options: {},
+        timeout: gitConfig.GitLsRemoteTimeout
+      });
       return true;
     } catch (e) {
       logger.debug(`节点 [${nodeConfig.name}] 对分支 [${branch}] 的 ls-remote 测试失败: ${e.message}`);
       return false;
     }
   }
-  
+
   async _getSortedNodes(repoUrl, branch, gitConfig) {
     const allHttpTestResults = await this._testNetworkNodes(repoUrl, gitConfig);
     const gitTestPromises = allHttpTestResults.map(node =>
@@ -268,8 +307,8 @@ class GitService {
     );
     const gitTestResults = await Promise.all(gitTestPromises);
     const combinedResults = allHttpTestResults.map(http => {
-        const git = gitTestResults.find(g => g.name === http.name);
-        return { ...http, gitAvailable: git ? git.gitResult : false };
+      const git = gitTestResults.find(g => g.name === http.name);
+      return { ...http, gitAvailable: git ? git.gitResult : false };
     });
     const availableNodes = combinedResults.filter(node => node.available || node.gitAvailable);
     const nodeStats = await this._getNodeStats();
@@ -278,7 +317,7 @@ class GitService {
       score: this._calculateNodeScore(nodeStats[node.name])
     }));
     scoredNodes.sort((a, b) => {
-      if (a.gitAvailable !== b.gitAvailable) return b.gitAvailable - a.gitAvailable;
+      if (a.gitAvailable !== b.gitAvailable) return b.gitAvailable - b.gitAvailable;
       if (b.score !== a.score) return b.score - a.score;
       if (a.speed !== b.speed) return a.speed - b.speed;
       return a.priority - b.priority;
@@ -291,13 +330,13 @@ class GitService {
     if (repoInfo.platform !== 'github' || !nodeConfig.url) return repoUrl;
     const cleanPrefix = nodeConfig.url.replace(/\/$/, "");
     if (nodeConfig.name === "GitClone") {
-        return `${cleanPrefix}/${repoUrl.replace(/^https?:\/\//, "")}`;
+      return `${cleanPrefix}/${repoUrl.replace(/^https?:\/\//, "")}`;
     }
     if (nodeConfig.name === "Mirror") {
-        return `${cleanPrefix}/${repoInfo.owner}/${repoInfo.repo}.git`;
+      return `${cleanPrefix}/${repoInfo.owner}/${repoInfo.repo}.git`;
     }
     if (nodeConfig.name === "GitHub") {
-        return `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
+      return `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
     }
     return `${cleanPrefix}/github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
   }
@@ -305,15 +344,30 @@ class GitService {
   async _attemptUpdate({ localPath, branch, gitConfig }) {
     let wasForceReset = false;
     try {
-      await process.execute("git", ["pull", "origin", branch, "--ff-only"], { cwd: localPath }, gitConfig.GitPullTimeout);
+      await processService.execute({
+        command: "git",
+        args: ["pull", "origin", branch, "--ff-only"],
+        options: { cwd: localPath },
+        timeout: gitConfig.GitPullTimeout
+      });
     } catch (pullError) {
       const stderr = (pullError.stderr || "").toLowerCase();
       const conflictKeywords = ["not possible to fast-forward", "diverging branches", "unrelated histories", "commit your changes", "needs merge"];
       if (conflictKeywords.some(keyword => stderr.includes(keyword))) {
         logger.warn(`[${path.basename(localPath)}] 更新检测到冲突，执行强制重置...`);
         try {
-          await process.execute("git", ["fetch", "origin"], { cwd: localPath }, gitConfig.GitPullTimeout);
-          await process.execute("git", ["reset", "--hard", `origin/${branch}`], { cwd: localPath }, gitConfig.GitPullTimeout);
+          await processService.execute({
+            command: "git",
+            args: ["fetch", "origin"],
+            options: { cwd: localPath },
+            timeout: gitConfig.GitPullTimeout
+          });
+          await processService.execute({
+            command: "git",
+            args: ["reset", "--hard", `origin/${branch}`],
+            options: { cwd: localPath },
+            timeout: gitConfig.GitPullTimeout
+          });
           wasForceReset = true;
         } catch (resetError) {
           logger.error(`[${path.basename(localPath)}] 强制重置失败:`, resetError);

@@ -1,4 +1,4 @@
-import { createLogger } from '#Yunara/utils/Logger';
+import { createLogger } from '#Yunara/utils/logger';
 
 const logger = createLogger('Yunara:Core:Initialize');
 

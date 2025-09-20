@@ -2,39 +2,28 @@ import puppeteer from "puppeteer";
 import path from "node:path";
 import fs from "node:fs/promises";
 import template from "art-template";
-import { createLogger } from "#Yunara/utils/Logger";
-import { config } from "#Yunara/utils/Config";
-import { Yunara_Temp_Path } from "#Yunara/utils/Path";
-import { file as fileUtils } from "#Yunara/utils/File";
+import { createLogger } from "#Yunara/utils/logger";
+import { config } from "#Yunara/utils/config";
+import { Yunara_Temp_Path } from "#Yunara/utils/path"; 
+import cfg from "../../../lib/config/config.js";
+import { file as fileUtils } from "#Yunara/utils/file";
 
 const logger = createLogger("Yunara:Utils:Renderer");
 
-/**
- * @class RendererService
- * @description Yunara 的高级渲染服务。
- */
 class RendererService {
-  /** @private */
   browser = null;
-  /** @private */
   #isStarting = false;
-  /** @private */
   #renderCount = 0;
-  /** @private */
   #config = {};
 
   constructor() {
     this.initialize();
   }
 
-  /**
-   * @private
-   * @description 初始化服务，加载配置。
-   */
   async initialize() {
     this.#config = await config.get('renderer');
     if (!this.#config) {
-        logger.warn("渲染器配置 (Renderer.yaml) 未找到，将使用默认值。");
+        logger.warn("渲染器配置 (renderer.yaml) 未找到，将使用默认值。");
         this.#config = { restartThreshold: 100, timeout: 30000 };
     }
   }
@@ -44,7 +33,6 @@ class RendererService {
       return this.browser;
     }
     if (this.#isStarting) {
-      // 如果正在启动，等待启动完成
       await new Promise(resolve => setTimeout(resolve, 100));
       return this.#getBrowser();
     }
@@ -57,13 +45,19 @@ class RendererService {
         headless: this.#config.headless || "new",
         args: this.#config.args || [],
       };
+
       if (this.#config.puppeteerWS) {
         this.browser = await puppeteer.connect({ browserWSEndpoint: this.#config.puppeteerWS });
         logger.info(`已连接到外部浏览器实例: ${this.#config.puppeteerWS}`);
       } else {
-        if (this.#config.chromiumPath) {
-          puppeteerConfig.executablePath = this.#config.chromiumPath;
+        const chromiumPath = this.#config.chromiumPath || cfg.bot?.chromium_path;
+        if (chromiumPath) {
+          puppeteerConfig.executablePath = chromiumPath;
+          logger.info(`使用浏览器路径: ${chromiumPath}`);
+        } else {
+          logger.info("未指定浏览器路径，将使用 Yunzai 提供的配置。");
         }
+        
         this.browser = await puppeteer.launch(puppeteerConfig);
         logger.info(`本地浏览器实例启动成功 (PID: ${this.browser.process().pid})`);
       }
@@ -83,12 +77,6 @@ class RendererService {
     }
   }
 
-  /**
-   * @public
-   * @description 核心渲染方法。
-   * @param {object} options
-   * @returns {Promise<Buffer|null>} 截图的 Buffer，失败则返回 null。
-   */
   async render(options) {
     const {
       templatePath,
@@ -99,7 +87,7 @@ class RendererService {
     const browser = await this.#getBrowser();
     if (!browser) return null;
 
-    const tempHtmlDir = path.join(Yunara_Temp_Path, 'renderer_html');
+    const tempHtmlDir = path.join(Yunara_Temp_Path, 'html');
     await fs.mkdir(tempHtmlDir, { recursive: true });
     const htmlPath = path.join(tempHtmlDir, `${Date.now()}-${Math.random()}.html`);
     let page;
@@ -115,19 +103,19 @@ class RendererService {
       await page.waitForFunction("window.dispatchEvent(new Event('yunara:render-ready'))", {
         timeout: this.#config.timeout || 30000,
       }).catch(async () => {
-        // 如果超时，尝试直接截图作为备用方案
         logger.warn(`[${path.basename(templatePath)}] 渲染等待 'yunara:render-ready' 事件超时，将尝试直接截图。`);
         await new Promise(resolve => setTimeout(resolve, 1000)); 
       });
 
       const element = await page.$('body');
-      const buffer = await element.screenshot({
+      const imageBase64 = await element.screenshot({
         type: 'png',
         ...screenshot,
+        encoding: 'base64' 
       });
 
       this.#renderCount++;
-      return buffer;
+      return imageBase64; 
 
     } catch (error) {
       logger.error(`渲染 [${path.basename(templatePath)}] 失败:`, error);

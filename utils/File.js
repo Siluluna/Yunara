@@ -1,6 +1,6 @@
 import fsExtra from "fs-extra";
 import path from "node:path";
-import { createLogger } from '#Yunara/utils/Logger';
+import { createLogger } from '#Yunara/utils/logger';
 
 const logger = createLogger('Yunara:Utils:File');
 
@@ -56,6 +56,15 @@ const fileUtils = {
       logger.error(`检查路径 ${targetPath} 是否存在时出错:`, error);
       return false;
     }
+  },
+
+  formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
 };
 

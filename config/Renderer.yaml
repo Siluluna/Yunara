@@ -3,8 +3,7 @@
 # ===================================================================
 
 # Chromium 文件路径
-# 如果留空，将使用 puppeteer 自带的。如果你的服务器环境特殊，
-# 可以指定一个已安装的 Chrome/Chromium/Edge 的路径。
+# 如果留空，将使用 Yunzai 自带的。如果你的服务器环境特殊，可以指定一个已安装的 Chrome/Chromium/Edge 的路径。
 # 示例: 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 chromiumPath:
 
@@ -23,8 +22,7 @@ userDataDir: "data/puppeteer"
 # false: 启动带有图形界面的浏览器，用于调试。
 headless: "new"
 
-# 浏览器启动参数
-# 默认已包含在大多数服务器环境下稳定运行所需的参数。
+# 浏览器启动参数-默认已包含在大多数服务器环境下稳定运行所需的参数。
 args:
   - --disable-gpu
   - --disable-setuid-sandbox

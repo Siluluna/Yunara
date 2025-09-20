@@ -1,7 +1,9 @@
-import { GuGuNiuApps } from './GuGuNiu/index.js';
-import { AdminPlugin } from './Admin.js'; 
+﻿import { NiuApps } from './niu/index.js';
+import { Admin } from './admin.js'; 
+import { Visualize } from './visualize.js'; 
 
 export const apps = {
-  ...GuGuNiuApps,
-  AdminPlugin, 
+  ...NiuApps,
+  Visualize,
+  Admin, 
 };

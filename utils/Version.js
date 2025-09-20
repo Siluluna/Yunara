@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Yunara_Path } from '#Yunara/utils/Path';
-import { createLogger } from '#Yunara/utils/Logger';
+import { Yunara_Path } from '#Yunara/utils/path';
+import { createLogger } from '#Yunara/utils/logger';
 
 const logger = createLogger('Yunara:Utils:Version');
 const packageJsonPath = path.join(Yunara_Path, 'package.json');

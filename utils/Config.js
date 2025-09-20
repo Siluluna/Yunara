@@ -2,8 +2,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import yaml from "yaml";
 import lodash from "lodash";
-import { createLogger } from "#Yunara/utils/Logger";
-import { Yunara_Config_Path } from "#Yunara/utils/Path";
+import { createLogger } from "#Yunara/utils/logger";
+import { Yunara_Config_Path } from "#Yunara/utils/path";
 
 const logger = createLogger("Yunara:Utils:Config");
 
@@ -17,28 +17,28 @@ const CONFIG_FILES = {
     dataKey: "yunara"
   },
   git: {
-    path: path.join(Yunara_Config_Path, "Git.yaml"),
+    path: path.join(Yunara_Config_Path, "git.yaml"),
     dataKey: "git"
   },
   renderer: {
-    path: path.join(Yunara_Config_Path, "Renderer.yaml"),
+    path: path.join(Yunara_Config_Path, "renderer.yaml"),
     dataKey: "renderer"
   },
   externalPlugins: {
-    path: path.join(Yunara_Config_Path, "Ex-Plugins.yaml"),
+    path: path.join(Yunara_Config_Path, "ex_plugins.yaml"),
     dataKey: "externalPlugins"
   },
   guguniu_gallery: {
-    path: path.join(Yunara_Config_Path, "GuGuNiu", "Gallery.yaml"),
-    dataKey: "guguniu.gallery"
+    path: path.join(Yunara_Config_Path, "niu", "gallery.yaml"),
+    dataKey: "niu.gallery"
   },
   guguniu_settings: {
-    path: path.join(Yunara_Config_Path, "GuGuNiu", "Settings.yaml"),
-    dataKey: "guguniu.settings"
+    path: path.join(Yunara_Config_Path, "niu", "settings.yaml"),
+    dataKey: "niu.settings"
   },
   guguniu_webui: {
-    path: path.join(Yunara_Config_Path, "GuGuNiu", "Webui.yaml"),
-    dataKey: "guguniu.webui"
+    path: path.join(Yunara_Config_Path, "niu", "webui.yaml"),
+    dataKey: "niu.webui"
   },
 };
 /**
@@ -98,13 +98,13 @@ class ConfigService {
 
     this.#config = loadedConfig;
     this.#isInitialized = true;
-    logger.info("配置服务初始化完成。");
+    logger.info("配置服务初始化完成");
   }
 
   /**
    * @public
    * 获取一个配置项的值。这是读取配置的唯一公共接口。
-   * @param {string} key 使用点分路径的键名 (e.g., 'guguniu.gallery.version')。
+   * @param {string} key 使用点分路径的键名 (e.g., 'niu.gallery.version')。
    * @param {*} [defaultValue=undefined] 如果未找到键，则返回此默认值。
    * @returns {Promise<*>} 配置项的值。
    */
@@ -117,7 +117,7 @@ class ConfigService {
   /**
    * @public
    * 设置一个配置项的值，并将其持久化到对应的 YAML 文件中。
-   * @param {string} key 使用点分路径的键名 (e.g., 'guguniu.gallery.autoUpdate')。
+   * @param {string} key 使用点分路径的键名 (e.g., 'niu.gallery.autoUpdate')。
    * @param {*} value 要设置的值。
    * @returns {Promise<boolean>} 如果成功则返回 true，否则抛出错误。
    */
@@ -126,7 +126,7 @@ class ConfigService {
     await this.#initializationPromise;
     
     // 智能查找该 key 属于哪个配置文件域。
-    // 通过查找最长匹配的 dataKey，确保了配置项被正确地归类。
+    // 通过查找最长匹配的 dataKey，确保配置项被正确地归类。
     const fileKey = Object.keys(CONFIG_FILES)
       .filter(k => key.startsWith(CONFIG_FILES[k].dataKey))
       .sort((a, b) => CONFIG_FILES[b].dataKey.length - CONFIG_FILES[a].dataKey.length)[0];

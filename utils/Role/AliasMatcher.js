@@ -2,9 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "yaml";
 import { pinyin } from "pinyin-pro";
-import { createLogger } from "#Yunara/utils/Logger";
-import { Yunzai_Path } from "#Yunara/utils/Path"; 
-import { config } from "#Yunara/utils/Config";
+import { createLogger } from "#Yunara/utils/logger";
+import { Yunzai_Path, Yunara_Repos_Path } from "#Yunara/utils/path"; 
+import { config } from "#Yunara/utils/config";
+import { NiuRepository } from "#Yunara/models/niu/repository"; 
 
 const logger = createLogger("Yunara:Utils:AliasMatcher");
 
@@ -58,37 +59,37 @@ class AliasMatcherService {
     async #initialize() {
         if (this.#isInitialized) return;
 
-        logger.info("别名匹配服务开始初始化...");
+        logger.info("多维别名匹配器开始初始化...");
 
-        const exPluginsConfig = await config.get('exPlugins');
+        const exPluginsConfig = await config.get('externalPlugins');
         if (!exPluginsConfig) {
-            logger.warn("未找到外部插件配置 (Ex-Plugins.yaml)，别名服务将为空。");
-            this.#isInitialized = true;
-            return;
+            logger.warn("未找到外部插件配置 (ex_plugins.yaml)，别名服务将为空。");
         }
 
         const aliasSources = [];
-        if (exPluginsConfig.miao?.gsAliasDir) {
+        if (exPluginsConfig?.miao?.gsAliasDir) {
             aliasSources.push({ path: path.join(Yunzai_Path, exPluginsConfig.miao.gsAliasDir), type: "miao" });
         }
-        if (exPluginsConfig.miao?.srAliasDir) {
+        if (exPluginsConfig?.miao?.srAliasDir) {
             aliasSources.push({ path: path.join(Yunzai_Path, exPluginsConfig.miao.srAliasDir), type: "miao" });
         }
-        if (exPluginsConfig.zzz?.aliasDir) {
+        if (exPluginsConfig?.zzz?.aliasDir) {
             aliasSources.push({ path: path.join(Yunzai_Path, exPluginsConfig.zzz.aliasDir, "alias.yaml"), type: "yaml" });
         }
-        if (exPluginsConfig.waves?.aliasDir) {
+        if (exPluginsConfig?.waves?.aliasDir) {
             aliasSources.push({ path: path.join(Yunzai_Path, exPluginsConfig.waves.aliasDir, "role.yaml"), type: "yaml" });
         }
 
         const combinedAliases = {};
 
         const loadPromises = aliasSources.map(source => this.#loadAliasSource(source, combinedAliases));
-        await Promise.all(loadPromises);
+        
+        const repoScanPromise = this.#scanRepoCharacterFolders(combinedAliases);
+        await Promise.all([...loadPromises, repoScanPromise]);
 
         this.#buildLookupTable(combinedAliases);
         this.#isInitialized = true;
-        logger.info(`别名服务初始化完成，共加载 ${this.#reverseAliasMap.size} 个别名与拼音，对应 ${this.#lookupTable.size} 个标准名。`);
+        logger.info(`多维别名匹配器初始化完成，共加载 ${this.#reverseAliasMap.size} 个别名与拼音，对应 ${this.#lookupTable.size} 个标准名。`);
     }
 
     async #loadAliasSource(source, targetObject) {
@@ -105,10 +106,49 @@ class AliasMatcherService {
                 const content = await fs.readFile(source.path, "utf8");
                 data = yaml.parse(content) ?? {};
             }
-            Object.assign(targetObject, data);
+            // 合并别名，确保不会覆盖已有的
+            for (const [mainName, aliases] of Object.entries(data)) {
+                if (!targetObject[mainName]) {
+                    targetObject[mainName] = [];
+                }
+                const existingAliases = new Set(targetObject[mainName]);
+                const newAliases = Array.isArray(aliases) ? aliases : String(aliases).split(',');
+                newAliases.forEach(alias => existingAliases.add(alias));
+                targetObject[mainName] = Array.from(existingAliases);
+            }
         } catch (error) {
             if (error.code !== 'ENOENT' && error.code !== 'ERR_MODULE_NOT_FOUND') {
                 logger.warn(`加载别名文件 ${source.path} 失败:`, error.message);
+            }
+        }
+    }
+
+    /**
+     * @private
+     * @description 扫描所有已下载的咕咕牛仓库，将角色文件夹名作为别名
+     */
+    async #scanRepoCharacterFolders(targetObject) {
+        const downloadedRepos = await NiuRepository.getDownloaded();
+        for (const repo of downloadedRepos) {
+            try {
+                const gameFolders = await fs.readdir(repo.localPath, { withFileTypes: true });
+                for (const gameFolder of gameFolders) {
+                    if (gameFolder.isDirectory()) {
+                        const gameFolderPath = path.join(repo.localPath, gameFolder.name);
+                        const characterFolders = await fs.readdir(gameFolderPath, { withFileTypes: true });
+                        for (const charFolder of characterFolders) {
+                            if (charFolder.isDirectory()) {
+                                const charName = charFolder.name;
+                                // 如果这个角色名还不存在，就添加它，自己是自己的别名
+                                if (!targetObject[charName]) {
+                                    targetObject[charName] = [charName];
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                logger.warn(`扫描仓库 [${repo.name}] 的角色文件夹失败:`, error.message);
             }
         }
     }

@@ -1,7 +1,7 @@
 import path from "node:path";
 import winston from "winston";
 import "winston-daily-rotate-file";
-import { Yunara_logs_Path } from "#Yunara/utils/Path";
+import { Yunara_logs_Path } from "#Yunara/utils/path";
 
 const customLevels = {
   levels: {
@@ -39,10 +39,10 @@ const consoleFormat = winston.format.combine(
     const DARK_RED_COLOR = '\u001b[31m';
 
     const specialMessages = [
-        '------------YUNARA------------',
-        /^Yunara云露 v[0-9.-rc]+ 初始化成功。$/,
+        '------------Yunara------------',
+        /^云☁️ 露插件 v[0-9.-rc]+ 初始化成功$/,
         '------------------------------',
-        '配置服务初始化完成。'
+        '配置服务初始化完成'
     ];
 
     const isSpecialMessage = (msg) => {

@@ -1,10 +1,10 @@
-import plugin from '../../../../lib/plugin/plugin.js';
+﻿import plugin from '../../../../lib/plugin/plugin.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import lodash from 'lodash';
-import { createLogger } from '#Yunara/utils/Logger';
-import { renderer } from '#Yunara/utils/Renderer';
-import { Yunara_Res_Path } from '#Yunara/utils/Path';
+import { createLogger } from '#yunara/utils/logger';
+import { renderer } from '#yunara/utils/Renderer';
+import { Yunara_Res_Path } from '#yunara/utils/path';
 
 const logger = createLogger('Yunara:Apps:Trigger');
 

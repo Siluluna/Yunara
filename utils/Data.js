@@ -1,23 +1,23 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import lodash from "lodash";
-import { createLogger } from "#Yunara/utils/Logger";
-import { Yunara_Data_Path } from "#Yunara/utils/Path";
+import { createLogger } from "#Yunara/utils/logger";
+import { Yunara_Data_Path, Yunara_Repos_Path } from "#Yunara/utils/path";
 
 const logger = createLogger("Yunara:Utils:Data");
 
 const JSON_FILES = {
   runtime: path.join(Yunara_Data_Path, "yunara_runtime.json"),
-  userBans: path.join(Yunara_Data_Path, "guguniu_bans.json"),
+  niu_userBans: path.join(Yunara_Data_Path, "niu", "niu_bans.json"),
+  niu_imagedata: path.join(Yunara_Repos_Path, "ImageData.json"),
+  niu_secondary_tags: path.join(Yunara_Repos_Path, "SecondTags.json"),
 };
 
 class DataService {
   #cache = {};
   #locks = new Map();
 
-  constructor() {
-    Object.keys(JSON_FILES).forEach(key => this.#loadJsonFile(key));
-  }
+  constructor() {}
 
   async #loadJsonFile(fileKey) {
     if (!this.#locks.has(fileKey)) {
@@ -28,11 +28,13 @@ class DataService {
           this.#cache[fileKey] = JSON.parse(fileContent);
         } catch (error) {
           if (error.code === 'ENOENT') {
-            this.#cache[fileKey] = fileKey === 'userBans' ? [] : {};
-            logger.warn(`数据文件 ${JSON_FILES[fileKey]} 不存在，将初始化为空值。`);
+            const emptyValue = (fileKey === 'niu_userBans' || fileKey === 'niu_secondary_tags') ? [] : {};
+            this.#cache[fileKey] = emptyValue;
+            logger.debug(`数据文件 ${JSON_FILES[fileKey]} 不存在，将初始化为默认值。`);
           } else {
             logger.error(`读取或解析数据文件 ${JSON_FILES[fileKey]} 失败：`, error);
-            this.#cache[fileKey] = fileKey === 'userBans' ? [] : {};
+            const emptyValue = (fileKey === 'niu_userBans' || fileKey === 'niu_secondary_tags') ? [] : {};
+            this.#cache[fileKey] = emptyValue;
           }
         } finally {
           this.#locks.delete(fileKey);
@@ -46,6 +48,9 @@ class DataService {
     const [fileKey, ...pathParts] = key.split('.');
     if (!JSON_FILES[fileKey]) {
       throw new Error(`未知的数据文件域: ${fileKey}`);
+    }
+    if (this.#cache[fileKey] === undefined) {
+      await this.#loadJsonFile(fileKey);
     }
     if (this.#locks.has(fileKey)) {
       await this.#locks.get(fileKey);
@@ -61,8 +66,8 @@ class DataService {
     if (!JSON_FILES[fileKey]) {
       throw new Error(`未知的数据文件域: ${fileKey}`);
     }
-    if (this.#locks.has(fileKey)) {
-      await this.#locks.get(fileKey);
+    if (this.#cache[fileKey] === undefined) {
+      await this.get(fileKey);
     }
     if (pathParts.length === 0) {
         this.#cache[fileKey] = value;
@@ -78,7 +83,7 @@ class DataService {
 
   async #saveJsonFile(fileKey) {
     const filePath = JSON_FILES[fileKey];
-    const dataToSave = this.#cache[fileKey] || (fileKey === 'userBans' ? [] : {});
+    const dataToSave = this.#cache[fileKey] || ((fileKey === 'niu_userBans' || fileKey === 'niu_secondary_tags') ? [] : {});
     try {
       const jsonString = JSON.stringify(dataToSave, null, 2);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
